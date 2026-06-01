@@ -1,4 +1,7 @@
 # ShopLite - Starter TP final DevOps
+Membres du groupe
+Amadou Diop
+Hamed Kaffa
 
 ShopLite est un projet de base pour un TP final DevOps.
 
