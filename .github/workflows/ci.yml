@@ -37,8 +37,13 @@ jobs:
           cache-dependency-path: api/package-lock.json
       - run: npm ci
         working-directory: api
-      - run: npm test
+      - run: npm test -- --coverage
         working-directory: api
+      - uses: actions/upload-artifact@v4
+        if: matrix.node-version == 20
+        with:
+          name: coverage-report
+          path: api/coverage/
 
   build:
     runs-on: ubuntu-latest
