@@ -1,8 +1,12 @@
 # ShopLite - Starter TP final DevOps
+
+[![CI](https://github.com/amadoudiop04/tp_final_deVops_B3/actions/workflows/ci.yml/badge.svg)](https://github.com/amadoudiop04/tp_final_deVops_B3/actions/workflows/ci.yml)
+[![CD](https://github.com/amadoudiop04/tp_final_deVops_B3/actions/workflows/cd.yml/badge.svg)](https://github.com/amadoudiop04/tp_final_deVops_B3/actions/workflows/cd.yml)
+
 Membres du groupe
 Amadou Diop
 Hamed Kaffa
-
+B3 Dev
 ShopLite est un projet de base pour un TP final DevOps.
 
 Les etudiants recoivent uniquement ce socle applicatif :
