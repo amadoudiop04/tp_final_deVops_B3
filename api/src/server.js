@@ -10,7 +10,7 @@ app.listen(port, "0.0.0.0", () => {
       level: "info",
       message: "ShopLite API started",
       port,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
   );
 });
