@@ -1,6 +1,8 @@
 name: CD starter a completer
 
 on:
+  push:
+    tags: ["v*"]
   workflow_dispatch:
 
 jobs:
