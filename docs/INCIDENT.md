@@ -1,32 +1,26 @@
-# Incidents
-
-## CI-001 — Échec du job `lint` sur les premiers runs CI
+# Rapport d'incident — CI-001
 
 **Date :** 2026-06-10
-**Sévérité :** Moyenne — la CI bloquait tous les pushes sur la branche `feat/dc-automatisation`
+**Impact :** La CI bloquait tous les pushes sur la branche
 
-### Constat
+---
 
-Les deux premiers runs CI ont échoué en 22 secondes. Le job `lint` s'arrêtait immédiatement avec l'erreur suivante :
+## Ce qui s'est passé
 
-```
-ESLint couldn't find an eslint.config.(js|mjs|cjs) file.
-```
+Dès le premier run, le job de lint échouait en moins de 30 secondes avec un message indiquant qu'aucun fichier de configuration ESLint n'était trouvé.
 
 ![Workflow en échec](img/workflow%20error.png)
 
-### Cause
+## Pourquoi
 
-ESLint v9 (installé dans `api/package.json`) a abandonné le format `.eslintrc.*` au profit du nouveau format `eslint.config.js`. Le projet ne contenait aucun fichier de configuration ESLint, ce qui rendait la commande `npm run lint` inutilisable.
+La version d'ESLint utilisée (v9) ne reconnaît plus l'ancien format de configuration `.eslintrc`. Elle attend un fichier `eslint.config.js`. Ce fichier n'existait pas dans le projet, donc ESLint ne savait pas quoi faire et plantait immédiatement.
 
-De plus, les globaux Jest (`test`, `expect`) n'étaient pas déclarés, ce qui aurait provoqué des erreurs `no-undef` sur les fichiers de tests.
+## Comment c'a été résolu
 
-### Résolution
-
-Création du fichier `api/eslint.config.js` avec deux blocs de configuration : un pour les fichiers source (`src/`) et un pour les tests (`tests/`) incluant les globaux Jest.
+Création du fichier `api/eslint.config.js` avec les bonnes règles pour les fichiers source et pour les fichiers de tests. Après ce correctif, tous les runs suivants sont passés.
 
 ![Workflow résolu](img/workflow-succes.png)
 
-### Leçon
+## Leçon retenue
 
-Vérifier la compatibilité des outils (ESLint v9 = flat config obligatoire) avant de les intégrer dans la CI. Tester `npm run lint` localement avant le premier push.
+Tester `npm run lint` en local avant le premier push pour éviter de découvrir ce type de problème directement en CI.

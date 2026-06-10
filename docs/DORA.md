@@ -1,118 +1,77 @@
-# Indicateurs DORA
+# Rapport DORA — ShopLite
 
-## Optimisation des Dockerfiles
+## 1. Les Dockerfiles
 
-### Dockerfile Backend (`api/Dockerfile`)
+### API (`api/Dockerfile`)
 
-Le Dockerfile backend a été refactorisé avec un **build multi-stage** et plusieurs améliorations :
+Le Dockerfile de l'API utilise un **build en deux étapes** :
 
-**Stage 1 — `deps` (installation des dépendances)**
-- Utilisation de `node:20-alpine` comme image de base légère
-- Copie uniquement des fichiers `package*.json` en premier pour **exploiter le cache Docker** : si les dépendances n'ont pas changé, cette couche n'est pas reconstruite
-- `npm ci --omit=dev` : installation propre sans les dépendances de développement
-- `npm cache clean --force` : suppression du cache npm pour réduire la taille de l'image
+- La première étape installe uniquement les dépendances de production.
+- La deuxième étape copie le résultat et crée l'image finale, sans npm ni outils inutiles.
 
-**Stage 2 — `runner` (image finale)**
-- Image finale allégée : seul le résultat du stage `deps` est copié (`node_modules`), npm n'est pas présent dans l'image de production
-- Variables d'environnement explicites : `NODE_ENV=production`, `API_PORT=3000`, `NODE_OPTIONS="--max-old-space-size=512"` pour éviter les crashs silencieux
-- **Durcissement sécurité** : création d'un groupe système `nodejs` et d'un utilisateur non-root `appuser` (UID 1001), les fichiers applicatifs lui appartiennent
-- Exécution sous `USER appuser` : le processus ne tourne pas en root
-- `HEALTHCHECK` : sonde toutes les 30s via `wget` sur `/health`, 3 tentatives avant de considérer le conteneur unhealthy
-- `CMD` en exec form avec `--enable-source-maps` pour des stack traces exploitables en production
+Pour la sécurité, l'application ne tourne pas en root : un utilisateur `appuser` est créé et utilisé à la place. Un healthcheck vérifie toutes les 30 secondes que l'API répond bien sur `/health`.
+
+### Frontend (`frontend/Dockerfile`)
+
+Le frontend est servi par Nginx. Le Dockerfile copie les fichiers statiques et la configuration Nginx, puis ajoute un healthcheck sur la racine `/`.
 
 ---
 
-### Dockerfile Frontend (`frontend/Dockerfile`)
+## 2. Docker Compose
 
-Le Dockerfile frontend est basé sur **`nginx:1.27-alpine`** :
+### Démarrage
 
-- Copie de la configuration Nginx personnalisée (`nginx.conf`) et des sources statiques
-- `HEALTHCHECK` : sonde toutes les 30s via `wget` sur la racine `/`
+`docker compose up -d --build` construit les images et démarre les 4 services : base de données, API, frontend et proxy.
 
-**Configuration Nginx (`nginx.conf`) :**
-- **Compression gzip** activée sur `text/plain`, `text/css`, `application/javascript`, `application/json` pour réduire la bande passante
-- **En-têtes de sécurité** :
-  - `X-Frame-Options: SAMEORIGIN` — protection contre le clickjacking
-  - `X-Content-Type-Options: nosniff` — protection contre le MIME-sniffing
-- **Cache statique** : les assets CSS, JS, images et favicon sont mis en cache 1 an avec `Cache-Control: public, immutable`
-- **SPA routing** : `try_files $uri $uri/ /index.html` pour gérer le routage côté client
-
----
-
-## Orchestration locale avec Docker Compose
-
-### Démarrage complet — `docker compose up -d --build`
-
-Cette commande construit les images et démarre tous les services en arrière-plan. On remarque que `shoplite_db` passe en `Healthy` avant que l'API ne démarre : c'est le `depends_on: condition: service_healthy` qui force cette attente, évitant que l'API tente de se connecter à une base pas encore prête. Les layers déjà construits sont réutilisés depuis le cache Docker, ce qui accélère les reconstructions suivantes.
+La base de données démarre en premier grâce au `depends_on`, pour éviter que l'API se connecte à une base pas encore prête.
 
 ![docker compose up -d --build](img/dc-settings1.png)
 
----
+### État des services
 
-### État des services — `docker compose ps`
+Une fois démarrés, les services communiquent entre eux via un réseau interne. Seul le proxy est accessible depuis l'extérieur sur le port `8080`.
 
-```
-NAME               SERVICE   STATUS                   PORTS
-shoplite_db        db        Up (healthy)             5432/tcp
-shoplite_api       api       Up (health: starting)    3000/tcp
-shoplite_frontend  frontend  Up (health: starting)    80/tcp
-shoplite_proxy     proxy     Up                       0.0.0.0:8080->80/tcp
-```
+### Staging
 
-`db` est le seul service déjà `healthy` car son healthcheck (`pg_isready`) est plus rapide. Le `proxy` est le seul exposé sur l'hôte (port `8080`) — les autres services communiquent uniquement via le réseau interne `shoplite_net`.
-
----
-
-### Logs de l'API — `docker compose logs --tail=80 api`
-
-```json
-{"level":"info","message":"ShopLite API started","port":3000,"timestamp":"2026-06-10T12:23:39.005Z"}
-{"level":"info","method":"GET","path":"/health","status":200,"duration_ms":26,"timestamp":"2026-06-10T12:23:43.870Z"}
-```
-
-Les logs sont en JSON structuré, ce qui facilite leur exploitation dans un outil de monitoring. Le second log montre le healthcheck Docker qui interroge `/health` — preuve que la rotation `json-file` avec `max-size: 10m` est bien active.
-
----
-
-### Redémarrage ciblé — `docker compose restart api`
-
-```bash
-docker compose restart api
-# → Container shoplite_api Restarting → Started
-```
-
-Seul le conteneur `api` est redémarré, `db`, `frontend` et `proxy` continuent de tourner sans interruption. C'est utile pour appliquer un changement de variable d'environnement sans reconstruire l'image ni couper l'accès au frontend.
-
----
-
-### Rebuild ciblé — `docker compose up -d --build api`
-
-Contrairement à `restart`, cette commande reconstruit l'image avant de recréer le conteneur. Docker réévalue le `depends_on: service_healthy` même pour un rebuild ciblé, donc l'API attend à nouveau que `db` soit prête avant de démarrer.
+Un fichier `docker-compose.staging.yml` surcharge la configuration de base pour l'environnement de staging : version différente et port `8081`. Les autres services restent identiques.
 
 ![docker compose up -d --build api](img/dc-settings2.png)
 
 ---
 
-### Configuration fusionnée staging — `docker compose config`
+## 3. Inspection des images Docker
 
-```bash
-docker compose -f docker-compose.yml -f docker-compose.staging.yml config
-```
+### Avant les tags versionnés
 
-Cette commande affiche la configuration finale après fusion des deux fichiers, avec toutes les variables du `.env` interpolées. On peut vérifier que l'override staging a bien appliqué `APP_VERSION: staging-starter` sur l'API et ajouté le port `8081` sur le proxy — sans toucher aux autres services.
+On pouvait déjà inspecter une image locale avec `docker inspect` pour vérifier sa configuration (port exposé, commande de démarrage, variables d'environnement).
+
+![Inspection de l'image shoplite-api:local](img/dc-img-inspect.png)
 
 ---
 
-## Inspection de l'image Docker API
+## 4. Registry et tags Docker
 
-Commandes exécutées :
+### Pourquoi tagger les images ?
 
-```bash
-docker build -t shoplite-api:local ./api
-docker images shoplite-api
-docker inspect shoplite-api:local
-```
+Sans tag, toutes les images s'appellent `latest` et on ne sait plus quelle version correspond à quel déploiement. Tagger permet de retrouver une version précise, de faire un rollback et de savoir exactement ce qui tourne en production.
 
-Résultat :
+### Labels sur les images
 
-![Inspection de l'image shoplite-api:local](img/dc-img-inspect.png)
+Chaque image embarque maintenant des informations : la version, le commit Git exact et la date de build. Ces infos sont lisibles avec `docker inspect` sans avoir à ouvrir le code.
+
+### Tags produits
+
+Quand on build avec le script `scripts/build-and-tag.sh`, chaque image reçoit deux tags :
+
+| Image | Tags |
+|---|---|
+| API | `shoplite-api:latest` et `shoplite-api:v1.0.0` |
+| Frontend | `shoplite-frontend:latest` et `shoplite-frontend:v1.0.0` |
+
+`:latest` et `:v1.0.0` pointent vers la même image — c'est normal. `:latest` est juste un raccourci vers la version la plus récente.
+
+### Comparer les versions
+
+Le script `scripts/compare-images.sh` affiche côte à côte les infos des deux tags pour vérifier qu'ils correspondent bien à la même image.
+
+![Images Docker versionnées](img/img-docker.png)
