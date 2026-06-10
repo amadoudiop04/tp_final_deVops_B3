@@ -1,4 +1,8 @@
 # ShopLite - Starter TP final DevOps
+
+[![CI](https://github.com/amadoudiop04/tp_final_deVops_B3/actions/workflows/ci.yml/badge.svg)](https://github.com/amadoudiop04/tp_final_deVops_B3/actions/workflows/ci.yml)
+[![CD](https://github.com/amadoudiop04/tp_final_deVops_B3/actions/workflows/cd.yml/badge.svg)](https://github.com/amadoudiop04/tp_final_deVops_B3/actions/workflows/cd.yml)
+
 Membres du groupe
 Amadou Diop
 Hamed Kaffa
