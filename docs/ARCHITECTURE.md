@@ -40,4 +40,18 @@ GitHub fusionne la branche dans `main` et propose de supprimer la branche source
 
 ---
 
+## 4. Pipeline CI/CD GitHub Actions
+
+Le pipeline est divisé en deux workflows distincts : `ci.yml` pour la validation du code et `cd.yml` pour le déploiement.
+
+**CI (`ci.yml`)** se déclenche sur chaque push et pull request. Il exécute en parallèle un job `lint` (ESLint) et un job `test` sur une matrice Node 18/20 avec une base PostgreSQL de test. Le job `build` ne démarre que si les deux passent grâce à `needs`. Le rapport de coverage est uploadé en artefact téléchargeable à chaque run.
+
+**CD (`cd.yml`)** se déclenche uniquement sur un tag `v*`. Il enchaîne `deploy-staging` puis `deploy-production`, ce dernier étant conditionné par un `if: startsWith(github.ref, 'refs/tags/v')` pour éviter tout déploiement accidentel.
+
+L'image ci-dessous montre l'historique des 8 runs sur la branche `feat/dc-automatisation` : les 3 premiers ont échoué (ESLint sans config), tous les suivants sont verts après correction.
+
+![Historique des workflow runs](img/WOrkflow8.png)
+
+---
+
 ## Flux de travail résumé
