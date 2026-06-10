@@ -6,7 +6,7 @@
 Membres du groupe
 Amadou Diop
 Hamed Kaffa
-
+B3 Dev
 ShopLite est un projet de base pour un TP final DevOps.
 
 Les etudiants recoivent uniquement ce socle applicatif :
