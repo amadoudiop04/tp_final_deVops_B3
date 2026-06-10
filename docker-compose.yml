@@ -32,7 +32,13 @@ services:
       - shoplite_net
 
   api:
-    build: ./api
+    build:
+      context: ./api
+      args:
+        BUILD_VERSION: ${APP_VERSION:-latest}
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    image: shoplite-api:${APP_VERSION:-latest}
     container_name: shoplite_api
     env_file:
       - .env
@@ -58,7 +64,13 @@ services:
       - shoplite_net
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        BUILD_VERSION: ${APP_VERSION:-latest}
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILD_DATE: ${BUILD_DATE:-unknown}
+    image: shoplite-frontend:${APP_VERSION:-latest}
     container_name: shoplite_frontend
     logging:
       driver: "json-file"
