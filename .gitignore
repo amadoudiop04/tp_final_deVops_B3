@@ -11,3 +11,4 @@ logs
 backup-*.sql
 backups/*.sql
 tmp
+dumps
