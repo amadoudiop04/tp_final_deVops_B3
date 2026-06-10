@@ -14,7 +14,7 @@ app.get("/", (req, res) => {
   res.json({
     name: "ShopLite API",
     version: "0.1.0",
-    endpoints: ["/health", "/products"]
+    endpoints: ["/health", "/products"],
   });
 });
 
@@ -30,7 +30,7 @@ app.use((err, req, res, next) => {
     JSON.stringify({
       level: "error",
       message: err.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
   );
 
