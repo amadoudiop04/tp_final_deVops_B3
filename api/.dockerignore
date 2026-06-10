@@ -1,8 +1,8 @@
 node_modules
-npm-debug.log
-coverage
-.env
 .git
-logs
+.env*
 *.log
-*.sql
+coverage
+.nyc_output
+dist
+README.md
