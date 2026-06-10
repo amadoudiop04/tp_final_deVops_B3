@@ -1,14 +1,13 @@
-# Architecture du projet
+# Architecture du projet — ShopLite
 
 ## 1. Protection de la branche `main`
 
-La branche `main` est protégée sur GitHub. Il est impossible de pousser directement dessus.  
-Toute modification doit passer par une **Pull Request**.
+La branche `main` est protégée sur GitHub. On ne peut pas y pousser directement : toute modification passe obligatoirement par une Pull Request.
 
-**Règles configurées :**
-- 1 approbation obligatoire avant de merger
-- Le CI doit être vert (tests passants)
-- La branche doit être à jour avec `main`
+Pour qu'une PR puisse être mergée, il faut :
+- Au moins une approbation d'un autre membre
+- Que tous les tests CI soient passants
+- Que la branche soit à jour avec `main`
 
 ![Branch protection](img/image.png)
 
@@ -16,16 +15,9 @@ Toute modification doit passer par une **Pull Request**.
 
 ## 2. Template de Pull Request
 
-Le fichier `.github/pull_request_template.md` est automatiquement chargé quand on ouvre une PR sur GitHub.  
-Il oblige l'auteur à remplir un formulaire structuré avant de demander une review.
+Quand on ouvre une PR, un formulaire se remplit automatiquement. Il demande de décrire ce que fait la PR, de cocher une checklist de vérifications et d'indiquer comment annuler si quelque chose se passe mal.
 
-**Le template contient :**
-- Le type de changement (bug fix, nouvelle fonctionnalité, refactoring)
-- L'objectif de la PR en quelques lignes
-- Une checklist de vérifications à cocher
-- Les risques éventuels et comment annuler si besoin
-
-Tant que la checklist n'est pas complète et qu'il n'y a pas d'approbation, le merge est bloqué.
+Ça évite les PR ouvertes à la va-vite sans contexte.
 
 ![Pull request avec template](img/pull_request.png)
 
@@ -33,25 +25,40 @@ Tant que la checklist n'est pas complète et qu'il n'y a pas d'approbation, le m
 
 ## 3. Merge d'une Pull Request
 
-Une fois la PR approuvée et le CI vert, le merge est autorisé.  
-GitHub fusionne la branche dans `main` et propose de supprimer la branche source.
+Une fois la PR approuvée et les tests verts, le merge est autorisé. GitHub fusionne la branche dans `main` et propose de supprimer la branche source.
 
 ![Merge réussi](img/merge.png)
 
 ---
 
-## 4. Pipeline CI/CD GitHub Actions
+## 4. Pipeline CI — Tests et qualité
 
-Le pipeline est divisé en deux workflows distincts : `ci.yml` pour la validation du code et `cd.yml` pour le déploiement.
+Le workflow `ci.yml` se déclenche à chaque push et à chaque PR. Il fait tourner plusieurs vérifications en parallèle :
 
-**CI (`ci.yml`)** se déclenche sur chaque push et pull request. Il exécute en parallèle un job `lint` (ESLint) et un job `test` sur une matrice Node 18/20 avec une base PostgreSQL de test. Le job `build` ne démarre que si les deux passent grâce à `needs`. Le rapport de coverage est uploadé en artefact téléchargeable à chaque run.
+- **Lint** : vérifie que le code respecte les règles ESLint et Prettier
+- **Tests unitaires** : Jest avec une couverture minimum de 80%
+- **Tests d'intégration** : sur une vraie base PostgreSQL, avec un cycle incident/rollback simulé
+- **Audit de sécurité** : `npm audit` pour détecter les dépendances vulnérables
 
-**CD (`cd.yml`)** se déclenche uniquement sur un tag `v*`. Il enchaîne `deploy-staging` puis `deploy-production`, ce dernier étant conditionné par un `if: startsWith(github.ref, 'refs/tags/v')` pour éviter tout déploiement accidentel.
-
-L'image ci-dessous montre l'historique des 8 runs sur la branche `feat/dc-automatisation` : les 3 premiers ont échoué (ESLint sans config), tous les suivants sont verts après correction.
+Si une étape échoue, le merge est bloqué.
 
 ![Historique des workflow runs](img/WOrkflow8.png)
 
 ---
 
-## Flux de travail résumé
+## 5. Pipeline CD — Déploiement et tags Docker
+
+Le workflow `cd.yml` se déclenche uniquement quand on pousse un tag Git de type `v1.0.0`. Il enchaîne trois étapes :
+
+**Étape 1 — Build des images**
+Les images Docker sont construites avec deux tags chacune : `:latest` et `:v1.0.0`. La version vient directement du tag Git, ce qui crée un lien traçable entre le code et l'image déployée.
+
+**Étape 2 — Staging**
+Les images sont déployées en staging. Un smoke test vérifie que tout démarre correctement.
+
+**Étape 3 — Production**
+Le déploiement en production n'est possible que si le tag Git commence par `v`. C'est une sécurité pour éviter tout déploiement accidentel.
+
+```
+build-images → deploy-staging → deploy-production
+```
