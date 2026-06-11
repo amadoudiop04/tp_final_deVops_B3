@@ -16,7 +16,6 @@ services:
       APP_VERSION: ${APP_VERSION:-staging}
       DATABASE_URL: postgres://shoplite_staging:shoplite_staging_password@db:5432/shoplite_staging
       NODE_ENV: staging
-      LOG_LEVEL: ${LOG_LEVEL:-debug}
 
   frontend:
     container_name: shoplite_frontend_staging

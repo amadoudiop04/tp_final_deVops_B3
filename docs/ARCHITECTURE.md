@@ -66,14 +66,6 @@ Le projet tourne en 3 environnements complètement isolés, chacun avec sa propr
 
 Chaque environnement a sa propre base de données (`shoplite`, `shoplite_staging`, `shoplite_prod`) pour éviter tout conflit entre les données.
 
-Les environnements `staging` et `prod` sont configurés dans GitHub :
-
-![Liste des environnements GitHub](img/confing-env1.png)
-
-La protection de l'environnement `prod` avec l'approbation obligatoire :
-
-![Configuration de l'environnement prod](img/config-env2.png)
-
 ---
 
 ## 6. Pipeline CD — Déploiement et tags Docker
@@ -81,20 +73,28 @@ La protection de l'environnement `prod` avec l'approbation obligatoire :
 Le workflow `cd.yml` se déclenche selon la branche ou le tag :
 
 - **Push sur `Dev`** → déploiement automatique en staging
-- **Push d'un tag `v*`** → staging puis production, avec **approbation manuelle obligatoire**
+- **Push d'un tag `v*`** → déploiement en production, avec **approbation manuelle obligatoire**
 
 **Étape 1 — Build des images**
 Les images Docker sont construites avec deux tags chacune : `:latest` et `:v1.0.0`. La version vient directement du tag Git.
 
 **Étape 2 — Staging**
-La stack staging démarre sur le port `8081`, un smoke test vérifie que l'API répond, puis la stack est arrêtée.
+Les images sont déployées en staging via l'environnement GitHub `staging`.
 
 **Étape 3 — Production**
 Le job attend une approbation manuelle dans GitHub avant de continuer. C'est configuré dans **Settings → Environments → prod → Required reviewers**.
 
+Les deux environnements `staging` et `prod` sont visibles dans GitHub :
+
+![Liste des environnements GitHub](img/confing-env1.png)
+
+La protection de l'environnement `prod` avec l'approbation obligatoire :
+
+![Configuration de l'environnement prod](img/config-env2.png)
+
 ```
 Dev branch  →  build-images  →  deploy-staging
-tag v*      →  build-images  →  deploy-staging  →  deploy-prod (approbation requise)
+tag v*      →  build-images  →  deploy-prod (approbation requise)
 ```
 
 ### Validation manuelle en action

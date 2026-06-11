@@ -8,8 +8,8 @@ name: CD — ShopLite
 # ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
-    branches: [Dev]
-    tags: ["v*"]
+    branches: ["Dev"]   # → staging
+    tags: ["v*"]        # → production
   workflow_dispatch:
     inputs:
       target:
@@ -82,8 +82,8 @@ jobs:
     name: "Déploiement staging (port 8081)"
     runs-on: ubuntu-latest
     needs: build-images
+    if: github.ref == 'refs/heads/Dev'
     environment: staging
-
     steps:
       - uses: actions/checkout@v4
 
@@ -143,10 +143,9 @@ jobs:
   deploy-production:
     name: "Déploiement production (port 8080)"
     runs-on: ubuntu-latest
-    needs: [build-images, deploy-staging]
+    needs: build-images
     if: startsWith(github.ref, 'refs/tags/v')
-    environment: prod   # ← pause ici en attendant approbation manuelle
-
+    environment: prod
     steps:
       - uses: actions/checkout@v4
 
