@@ -1,8 +1,5 @@
 services:
   api:
     environment:
-      APP_VERSION: staging-starter
-
-  proxy:
-    ports:
-      - "8081:80"
+      APP_VERSION: ${APP_VERSION:-staging}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
