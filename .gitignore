@@ -10,5 +10,6 @@ logs
 *.key
 backup-*.sql
 backups/*.sql
+backups/*.sql.gz
 tmp
 dumps
