@@ -76,7 +76,7 @@ Le workflow `cd.yml` se déclenche selon la branche ou le tag :
 - **Push d'un tag `v*`** → déploiement en production, avec **approbation manuelle obligatoire**
 
 **Étape 1 — Build des images**
-Les images Docker sont construites avec deux tags chacune : `:latest` et `:v1.0.0`. La version vient directement du tag Git, ce qui crée un lien traçable entre le code et l'image déployée.
+Les images Docker sont construites avec deux tags chacune : `:latest` et `:v1.0.0`. La version vient directement du tag Git.
 
 **Étape 2 — Staging**
 Les images sont déployées en staging via l'environnement GitHub `staging`.

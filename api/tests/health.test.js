@@ -19,6 +19,15 @@ describe("GET /", () => {
   });
 });
 
+describe("GET /ready", () => {
+  test("retourne 200 et status ready", async () => {
+    const response = await request(app).get("/ready");
+
+    expect(response.status).toBe(200);
+    expect(response.body.status).toBe("ready");
+  });
+});
+
 describe("GET /health", () => {
   test("retourne 200 et status ok quand la DB est disponible", async () => {
     db.query.mockResolvedValueOnce({ rows: [{ "?column?": 1 }] });
