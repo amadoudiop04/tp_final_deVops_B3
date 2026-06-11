@@ -46,19 +46,53 @@ Si une étape échoue, le merge est bloqué.
 
 ---
 
-## 5. Pipeline CD — Déploiement et tags Docker
+## 5. Environnements — Dev, Staging, Production
 
-Le workflow `cd.yml` se déclenche uniquement quand on pousse un tag Git de type `v1.0.0`. Il enchaîne trois étapes :
+Le projet tourne en 3 environnements complètement isolés, chacun avec sa propre base de données et son propre port.
+
+### URLs locales
+
+| Environnement | URL locale | Port app | Port DB |
+|---|---|---|---|
+| **Dev** | http://localhost:8080 | 8080 | 5433 |
+| **Staging** | http://localhost:8081 | 8081 | 5434 |
+| **Production** | http://localhost:8082 | 8082 | 5435 |
+
+### Lancer un environnement
+
+- **Dev** : `docker compose up -d`
+- **Staging** : `docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d`
+- **Production** : `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+
+Chaque environnement a sa propre base de données (`shoplite`, `shoplite_staging`, `shoplite_prod`) pour éviter tout conflit entre les données.
+
+---
+
+## 6. Pipeline CD — Déploiement et tags Docker
+
+Le workflow `cd.yml` se déclenche selon la branche ou le tag :
+
+- **Push sur `Dev`** → déploiement automatique en staging
+- **Push d'un tag `v*`** → déploiement en production, avec **approbation manuelle obligatoire**
 
 **Étape 1 — Build des images**
 Les images Docker sont construites avec deux tags chacune : `:latest` et `:v1.0.0`. La version vient directement du tag Git, ce qui crée un lien traçable entre le code et l'image déployée.
 
 **Étape 2 — Staging**
-Les images sont déployées en staging. Un smoke test vérifie que tout démarre correctement.
+Les images sont déployées en staging via l'environnement GitHub `staging`.
 
 **Étape 3 — Production**
-Le déploiement en production n'est possible que si le tag Git commence par `v`. C'est une sécurité pour éviter tout déploiement accidentel.
+Le job attend une approbation manuelle dans GitHub avant de continuer. C'est configuré dans **Settings → Environments → prod → Required reviewers**.
+
+Les deux environnements `staging` et `prod` sont visibles dans GitHub :
+
+![Liste des environnements GitHub](img/confing-env1.png)
+
+La protection de l'environnement `prod` avec l'approbation obligatoire :
+
+![Configuration de l'environnement prod](img/config-env2.png)
 
 ```
-build-images → deploy-staging → deploy-production
+Dev branch  →  build-images  →  deploy-staging
+tag v*      →  build-images  →  deploy-prod (approbation requise)
 ```
