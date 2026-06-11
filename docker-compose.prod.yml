@@ -1,0 +1,29 @@
+services:
+  db:
+    container_name: shoplite_db_prod
+    environment:
+      POSTGRES_DB: shoplite_prod
+      POSTGRES_USER: shoplite_prod
+      POSTGRES_PASSWORD: shoplite_prod_password
+    volumes:
+      - shoplite_pgdata_prod:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+
+  api:
+    container_name: shoplite_api_prod
+    environment:
+      APP_VERSION: ${APP_VERSION:-prod}
+      DATABASE_URL: postgres://shoplite_prod:shoplite_prod_password@db:5432/shoplite_prod
+      NODE_ENV: production
+
+  frontend:
+    container_name: shoplite_frontend_prod
+
+  proxy:
+    container_name: shoplite_proxy_prod
+    ports:
+      - "8082:80"
+
+volumes:
+  shoplite_pgdata_prod:
