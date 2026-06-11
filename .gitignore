@@ -4,7 +4,8 @@ node_modules
 !.env.example
 coverage
 dist
-logs
+logs/*
+!logs/.gitkeep
 *.log
 *.pem
 *.key
