@@ -96,3 +96,17 @@ La protection de l'environnement `prod` avec l'approbation obligatoire :
 Dev branch  →  build-images  →  deploy-staging
 tag v*      →  build-images  →  deploy-prod (approbation requise)
 ```
+
+### Validation manuelle en action
+
+Quand un tag `v*` est poussé, le job production se met en pause et attend qu'un reviewer approuve :
+
+![Le job prod en attente d'approbation](img/prod1.png)
+
+Le reviewer voit une fenêtre d'approbation avec un champ commentaire :
+
+![Fenêtre d'approbation](img/prod2.png)
+
+Une fois approuvé, le déploiement reprend automatiquement :
+
+![Déploiement approuvé et en cours](img/prod3.png)
