@@ -75,3 +75,38 @@ Quand on build avec le script `scripts/build-and-tag.sh`, chaque image reçoit d
 Le script `scripts/compare-images.sh` affiche côte à côte les infos des deux tags pour vérifier qu'ils correspondent bien à la même image.
 
 ![Images Docker versionnées](img/img-docker.png)
+
+---
+
+## 5. Logs et observabilité
+
+### Logs JSON structurés
+
+Chaque requête est loguée en JSON avec les champs : niveau, request_id, méthode, chemin, statut HTTP, durée et timestamp. Ce format permet de filtrer et d'analyser les logs facilement.
+
+### Niveaux de log
+
+| Niveau | Quand |
+|---|---|
+| `info` | Requêtes normales (2xx, 3xx) |
+| `warn` | Erreurs client (4xx) |
+| `error` | Erreurs serveur (5xx) |
+| `debug` | Headers détaillés (activé si `LOG_LEVEL=debug`) |
+
+### request_id
+
+Chaque requête reçoit un identifiant unique (`request_id`) généré automatiquement. Il est présent dans tous les logs et renvoyé dans le header `X-Request-Id` — ce qui permet de retrouver tous les logs liés à une requête précise en cas d'incident.
+
+### Sanitization
+
+Les headers sensibles (`authorization`, `cookie`, `token`, `password`, `secret`) sont automatiquement masqués avec `[MASKED]` dans les logs de debug pour ne jamais exposer de données confidentielles.
+
+### Rotation des logs
+
+La rotation est configurée dans Docker Compose pour chaque service :
+- API et DB : fichiers de max `10 Mo`, 3 fichiers conservés
+- Frontend et proxy : fichiers de max `5 Mo`, 2 fichiers conservés
+
+### Centralisation en production
+
+En production, les logs JSON seraient envoyés vers un outil de centralisation comme **Grafana Loki**, **Datadog** ou **ELK (Elasticsearch + Logstash + Kibana)**. Le driver `json-file` de Docker Compose peut être remplacé par un driver `loki` ou `fluentd` pour envoyer les logs directement sans modifier le code applicatif.

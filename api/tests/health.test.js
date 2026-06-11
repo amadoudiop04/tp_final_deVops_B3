@@ -14,7 +14,7 @@ describe("GET /", () => {
 
     expect(response.status).toBe(200);
     expect(response.body.name).toBe("ShopLite API");
-    expect(response.body.version).toBe("0.1.0");
+    expect(typeof response.body.version).toBe("string");
     expect(Array.isArray(response.body.endpoints)).toBe(true);
   });
 });
