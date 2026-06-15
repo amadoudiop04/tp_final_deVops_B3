@@ -1,27 +1,218 @@
-name: CD
+name: CD — ShopLite
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Déclencheurs
+#   push → Dev          : déploiement automatique en staging (port 8081)
+#   push → tag v*       : staging + validation manuelle + production (port 8080)
+#   workflow_dispatch   : déclenchement manuel (staging ou production)
+# ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
-    tags: ["v*"]
+    branches: ["Dev"]   # → staging
+    tags: ["v*"]        # → production
   workflow_dispatch:
+    inputs:
+      target:
+        description: "Environnement cible"
+        required: true
+        default: staging
+        type: choice
+        options: [staging, production]
 
 jobs:
-  deploy-staging:
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 1 — Build des images Docker
+  # Calcule la version depuis le tag Git ou le SHA court pour dev.
+  # ───────────────────────────────────────────────────────────────────────────
+  build-images:
+    name: "Build images Docker"
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build staging
-        run: docker compose -f docker-compose.yml -f docker-compose.staging.yml build
-      - name: Smoke test staging
-        run: echo "Staging OK — version ${{ github.ref_name }}"
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      git_sha: ${{ steps.meta.outputs.git_sha }}
+      build_date: ${{ steps.meta.outputs.build_date }}
 
-  deploy-production:
-    runs-on: ubuntu-latest
-    needs: deploy-staging
-    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
-      - name: Build production
-        run: docker compose build
-      - name: Simulate deploy
-        run: echo "Production déployée — version ${{ github.ref_name }}"
+
+      - name: Calculer la version
+        id: meta
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME}"
+          else
+            VERSION="staging-$(git rev-parse --short HEAD)"
+          fi
+          echo "version=${VERSION}"                          >> "$GITHUB_OUTPUT"
+          echo "git_sha=$(git rev-parse --short HEAD)"       >> "$GITHUB_OUTPUT"
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"  >> "$GITHUB_OUTPUT"
+
+      - name: Préparer le .env
+        env:
+          SECRET_POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          SECRET_POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          SECRET_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          cp .env.example .env
+          [ -n "$SECRET_POSTGRES_DB" ]       && sed -i "s|POSTGRES_DB=.*|POSTGRES_DB=${SECRET_POSTGRES_DB}|"             .env || true
+          [ -n "$SECRET_POSTGRES_USER" ]     && sed -i "s|POSTGRES_USER=.*|POSTGRES_USER=${SECRET_POSTGRES_USER}|"       .env || true
+          [ -n "$SECRET_POSTGRES_PASSWORD" ] && sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${SECRET_POSTGRES_PASSWORD}|" .env || true
+
+      - name: Build shoplite-api
+        run: |
+          docker build \
+            --build-arg BUILD_VERSION="${{ steps.meta.outputs.version }}" \
+            --build-arg GIT_SHA="${{ steps.meta.outputs.git_sha }}" \
+            --build-arg BUILD_DATE="${{ steps.meta.outputs.build_date }}" \
+            -t shoplite-api:latest \
+            -t shoplite-api:${{ steps.meta.outputs.version }} \
+            ./api
+
+      - name: Build shoplite-frontend
+        run: |
+          docker build \
+            --build-arg BUILD_VERSION="${{ steps.meta.outputs.version }}" \
+            --build-arg GIT_SHA="${{ steps.meta.outputs.git_sha }}" \
+            --build-arg BUILD_DATE="${{ steps.meta.outputs.build_date }}" \
+            -t shoplite-frontend:latest \
+            -t shoplite-frontend:${{ steps.meta.outputs.version }} \
+            ./frontend
+
+      - name: Inspecter les images produites
+        run: docker images | grep shoplite
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Déploiement staging
+  # Déclenché automatiquement sur push Dev ou tag v*.
+  # Démarre la stack sur port 8081, vérifie via smoke test.
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: "Déploiement staging (port 8081)"
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: github.ref == 'refs/heads/Dev'
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Préparer le .env
+        env:
+          SECRET_POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          SECRET_POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          SECRET_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          cp .env.example .env
+          [ -n "$SECRET_POSTGRES_DB" ]       && sed -i "s|POSTGRES_DB=.*|POSTGRES_DB=${SECRET_POSTGRES_DB}|"             .env || true
+          [ -n "$SECRET_POSTGRES_USER" ]     && sed -i "s|POSTGRES_USER=.*|POSTGRES_USER=${SECRET_POSTGRES_USER}|"       .env || true
+          [ -n "$SECRET_POSTGRES_PASSWORD" ] && sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${SECRET_POSTGRES_PASSWORD}|" .env || true
+
+      - name: Démarrer la stack staging
+        run: |
+          HTTP_PORT=8081 \
+          APP_VERSION=${{ needs.build-images.outputs.version }} \
+          GIT_SHA=${{ needs.build-images.outputs.git_sha }} \
+          BUILD_DATE=${{ needs.build-images.outputs.build_date }} \
+          docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --build
+
+      - name: Attendre le health check (max 60s)
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8081/api/health > /dev/null 2>&1; then
+              echo "Stack staging prete apres $((i*2))s"
+              break
+            fi
+            [ $i -lt 30 ] || { echo "ERREUR: timeout"; exit 1; }
+            sleep 2
+          done
+
+      - name: Smoke test staging
+        env:
+          BASE_URL: http://localhost:8081
+        run: sh scripts/smoke-test.sh
+
+      - name: Journal de deploiement staging
+        if: always()
+        run: |
+          echo "┌─────────────────────────────────────────────┐"
+          echo "│  JOURNAL — STAGING                          │"
+          echo "├─────────────────────────────────────────────┤"
+          echo "│  Version  : ${{ needs.build-images.outputs.version }}"
+          echo "│  SHA      : ${{ needs.build-images.outputs.git_sha }}"
+          echo "│  Date     : ${{ needs.build-images.outputs.build_date }}"
+          echo "│  Auteur   : ${{ github.actor }}"
+          echo "│  Branche  : ${{ github.ref_name }}"
+          echo "│  Resultat : ${{ job.status }}"
+          echo "└─────────────────────────────────────────────┘"
+
+      - name: Arrêter la stack staging
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.staging.yml down -v
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # JOB 3 — Déploiement production (tag v* uniquement)
+  #
+  # VALIDATION MANUELLE : l'environnement GitHub "production" doit être
+  # configuré avec des "Required reviewers" dans Settings > Environments.
+  # Le workflow se met en pause ici jusqu'à approbation d'un binôme
+  # ou du formateur avant de déployer.
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-production:
+    name: "Déploiement production (port 8080)"
+    runs-on: ubuntu-latest
+    needs: build-images
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Préparer le .env
+        env:
+          SECRET_POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          SECRET_POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          SECRET_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          cp .env.example .env
+          [ -n "$SECRET_POSTGRES_DB" ]       && sed -i "s|POSTGRES_DB=.*|POSTGRES_DB=${SECRET_POSTGRES_DB}|"             .env || true
+          [ -n "$SECRET_POSTGRES_USER" ]     && sed -i "s|POSTGRES_USER=.*|POSTGRES_USER=${SECRET_POSTGRES_USER}|"       .env || true
+          [ -n "$SECRET_POSTGRES_PASSWORD" ] && sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${SECRET_POSTGRES_PASSWORD}|" .env || true
+
+      - name: Démarrer la stack production
+        run: |
+          APP_VERSION=${{ needs.build-images.outputs.version }} \
+          GIT_SHA=${{ needs.build-images.outputs.git_sha }} \
+          BUILD_DATE=${{ needs.build-images.outputs.build_date }} \
+          docker compose up -d --build
+
+      - name: Attendre le health check (max 60s)
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/api/health > /dev/null 2>&1; then
+              echo "Stack production prete apres $((i*2))s"
+              break
+            fi
+            [ $i -lt 30 ] || { echo "ERREUR: timeout"; exit 1; }
+            sleep 2
+          done
+
+      - name: Smoke test production
+        env:
+          BASE_URL: http://localhost:8080
+        run: sh scripts/smoke-test.sh
+
+      - name: Journal de deploiement production
+        if: always()
+        run: |
+          echo "┌─────────────────────────────────────────────┐"
+          echo "│  JOURNAL — PRODUCTION                       │"
+          echo "├─────────────────────────────────────────────┤"
+          echo "│  Version  : ${{ needs.build-images.outputs.version }}"
+          echo "│  SHA      : ${{ needs.build-images.outputs.git_sha }}"
+          echo "│  Date     : ${{ needs.build-images.outputs.build_date }}"
+          echo "│  Auteur   : ${{ github.actor }}"
+          echo "│  Tag      : ${{ github.ref_name }}"
+          echo "│  Resultat : ${{ job.status }}"
+          echo "└─────────────────────────────────────────────┘"
+
+      - name: Arrêter la stack
+        if: always()
+        run: docker compose down -v

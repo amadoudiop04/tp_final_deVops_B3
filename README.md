@@ -6,7 +6,7 @@
 Membres du groupe
 Amadou Diop
 Hamed Kaffa
-
+B3 Dev
 ShopLite est un projet de base pour un TP final DevOps.
 
 Les etudiants recoivent uniquement ce socle applicatif :
@@ -75,7 +75,31 @@ Frontend :
 
 Ouvrir `frontend/src/index.html` dans un navigateur ou le servir avec un serveur statique.
 
-## Important
+## Commandes de diagnostic
 
-Le projet contient maintenant le minimum pour tourner avec Docker.
-Les etudiants doivent l'ameliorer pendant le TP pour atteindre les exigences finales.
+```bash
+# État des conteneurs
+docker compose ps
+
+# Logs de l'API (100 dernières lignes)
+docker compose logs --tail=100 api
+
+# Vérifier la santé de l'API
+curl http://localhost:8080/api/health
+
+# Vérifier la readiness
+curl http://localhost:8080/api/ready
+
+# Inspecter le conteneur API
+docker inspect shoplite_api
+```
+
+---
+
+## Tableau de suivi des incidents
+
+| Symptôme | Heure | Cause | Commande utilisée | Résultat |
+|---|---|---|---|---|
+| API renvoie 503 | 2026-06-10 12:00 | Table `products` supprimée (simulation incident) | `psql ... -f database/init.sql` | ✅ Table restaurée, API OK |
+| CI bloquée sur lint | 2026-06-10 09:00 | Fichier `eslint.config.js` manquant (ESLint v9) | Création de `api/eslint.config.js` | ✅ CI verte |
+| Workflow CD timeout | 2026-06-11 14:00 | Docker Hub injoignable depuis le runner GitHub | Re-run du job | ✅ Passé au second run |

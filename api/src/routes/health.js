@@ -3,27 +3,28 @@ const db = require("../db");
 
 const router = express.Router();
 
+// GET /health — état détaillé : API, DB, version, timestamp
 router.get("/", async (req, res) => {
-  const checks = {
-    api: "ok",
-    database: "unknown"
-  };
-
-  let status = 200;
+  let dbStatus = "ok";
+  let httpStatus = 200;
 
   try {
     await db.query("SELECT 1");
-    checks.database = "ok";
-  } catch (error) {
-    checks.database = "error";
-    status = 503;
+  } catch {
+    dbStatus = "error";
+    httpStatus = 503;
   }
 
-  res.status(status).json({
-    status: status === 200 ? "ok" : "error",
+  res.status(httpStatus).json({
+    status: httpStatus === 200 ? "ok" : "error",
     service: "shoplite-api",
-    checks,
-    timestamp: new Date().toISOString()
+    checks: {
+      api: "ok",
+      database: dbStatus,
+    },
+    version: process.env.APP_VERSION || "dev",
+    uptime_seconds: Math.floor(process.uptime()),
+    timestamp: new Date().toISOString(),
   });
 });
 

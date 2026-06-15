@@ -1,8 +1,29 @@
 services:
-  api:
+  db:
+    container_name: shoplite_db_staging
     environment:
-      APP_VERSION: staging-starter
+      POSTGRES_DB: shoplite_staging
+      POSTGRES_USER: shoplite_staging
+      POSTGRES_PASSWORD: shoplite_staging_password
+    volumes:
+      - shoplite_pgdata_staging:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+
+  api:
+    container_name: shoplite_api_staging
+    environment:
+      APP_VERSION: ${APP_VERSION:-staging}
+      DATABASE_URL: postgres://shoplite_staging:shoplite_staging_password@db:5432/shoplite_staging
+      NODE_ENV: staging
+
+  frontend:
+    container_name: shoplite_frontend_staging
 
   proxy:
+    container_name: shoplite_proxy_staging
     ports:
       - "8081:80"
+
+volumes:
+  shoplite_pgdata_staging:

@@ -5,7 +5,7 @@ let pool;
 function getPool() {
   if (!pool) {
     pool = new Pool({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
     });
   }
 
@@ -18,5 +18,5 @@ async function query(sql, params = []) {
 
 module.exports = {
   getPool,
-  query
+  query,
 };

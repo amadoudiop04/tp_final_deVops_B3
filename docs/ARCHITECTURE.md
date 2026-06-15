@@ -1,14 +1,13 @@
-# Architecture du projet
+# Architecture du projet — ShopLite
 
 ## 1. Protection de la branche `main`
 
-La branche `main` est protégée sur GitHub. Il est impossible de pousser directement dessus.  
-Toute modification doit passer par une **Pull Request**.
+La branche `main` est protégée sur GitHub. On ne peut pas y pousser directement : toute modification passe obligatoirement par une Pull Request.
 
-**Règles configurées :**
-- 1 approbation obligatoire avant de merger
-- Le CI doit être vert (tests passants)
-- La branche doit être à jour avec `main`
+Pour qu'une PR puisse être mergée, il faut :
+- Au moins une approbation d'un autre membre
+- Que tous les tests CI soient passants
+- Que la branche soit à jour avec `main`
 
 ![Branch protection](img/image.png)
 
@@ -16,16 +15,9 @@ Toute modification doit passer par une **Pull Request**.
 
 ## 2. Template de Pull Request
 
-Le fichier `.github/pull_request_template.md` est automatiquement chargé quand on ouvre une PR sur GitHub.  
-Il oblige l'auteur à remplir un formulaire structuré avant de demander une review.
+Quand on ouvre une PR, un formulaire se remplit automatiquement. Il demande de décrire ce que fait la PR, de cocher une checklist de vérifications et d'indiquer comment annuler si quelque chose se passe mal.
 
-**Le template contient :**
-- Le type de changement (bug fix, nouvelle fonctionnalité, refactoring)
-- L'objectif de la PR en quelques lignes
-- Une checklist de vérifications à cocher
-- Les risques éventuels et comment annuler si besoin
-
-Tant que la checklist n'est pas complète et qu'il n'y a pas d'approbation, le merge est bloqué.
+Ça évite les PR ouvertes à la va-vite sans contexte.
 
 ![Pull request avec template](img/pull_request.png)
 
@@ -33,25 +25,88 @@ Tant que la checklist n'est pas complète et qu'il n'y a pas d'approbation, le m
 
 ## 3. Merge d'une Pull Request
 
-Une fois la PR approuvée et le CI vert, le merge est autorisé.  
-GitHub fusionne la branche dans `main` et propose de supprimer la branche source.
+Une fois la PR approuvée et les tests verts, le merge est autorisé. GitHub fusionne la branche dans `main` et propose de supprimer la branche source.
 
 ![Merge réussi](img/merge.png)
 
 ---
 
-## 4. Pipeline CI/CD GitHub Actions
+## 4. Pipeline CI — Tests et qualité
 
-Le pipeline est divisé en deux workflows distincts : `ci.yml` pour la validation du code et `cd.yml` pour le déploiement.
+Le workflow `ci.yml` se déclenche à chaque push et à chaque PR. Il fait tourner plusieurs vérifications en parallèle :
 
-**CI (`ci.yml`)** se déclenche sur chaque push et pull request. Il exécute en parallèle un job `lint` (ESLint) et un job `test` sur une matrice Node 18/20 avec une base PostgreSQL de test. Le job `build` ne démarre que si les deux passent grâce à `needs`. Le rapport de coverage est uploadé en artefact téléchargeable à chaque run.
+- **Lint** : vérifie que le code respecte les règles ESLint et Prettier
+- **Tests unitaires** : Jest avec une couverture minimum de 80%
+- **Tests d'intégration** : sur une vraie base PostgreSQL, avec un cycle incident/rollback simulé
+- **Audit de sécurité** : `npm audit` pour détecter les dépendances vulnérables
 
-**CD (`cd.yml`)** se déclenche uniquement sur un tag `v*`. Il enchaîne `deploy-staging` puis `deploy-production`, ce dernier étant conditionné par un `if: startsWith(github.ref, 'refs/tags/v')` pour éviter tout déploiement accidentel.
-
-L'image ci-dessous montre l'historique des 8 runs sur la branche `feat/dc-automatisation` : les 3 premiers ont échoué (ESLint sans config), tous les suivants sont verts après correction.
+Si une étape échoue, le merge est bloqué.
 
 ![Historique des workflow runs](img/WOrkflow8.png)
 
 ---
 
-## Flux de travail résumé
+## 5. Environnements — Dev, Staging, Production
+
+Le projet tourne en 3 environnements complètement isolés, chacun avec sa propre base de données et son propre port.
+
+### URLs locales
+
+| Environnement | URL locale | Port app | Port DB |
+|---|---|---|---|
+| **Dev** | http://localhost:8080 | 8080 | 5433 |
+| **Staging** | http://localhost:8081 | 8081 | 5434 |
+| **Production** | http://localhost:8082 | 8082 | 5435 |
+
+### Lancer un environnement
+
+- **Dev** : `docker compose up -d`
+- **Staging** : `docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d`
+- **Production** : `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+
+Chaque environnement a sa propre base de données (`shoplite`, `shoplite_staging`, `shoplite_prod`) pour éviter tout conflit entre les données.
+
+---
+
+## 6. Pipeline CD — Déploiement et tags Docker
+
+Le workflow `cd.yml` se déclenche selon la branche ou le tag :
+
+- **Push sur `Dev`** → déploiement automatique en staging
+- **Push d'un tag `v*`** → déploiement en production, avec **approbation manuelle obligatoire**
+
+**Étape 1 — Build des images**
+Les images Docker sont construites avec deux tags chacune : `:latest` et `:v1.0.0`. La version vient directement du tag Git.
+
+**Étape 2 — Staging**
+Les images sont déployées en staging via l'environnement GitHub `staging`.
+
+**Étape 3 — Production**
+Le job attend une approbation manuelle dans GitHub avant de continuer. C'est configuré dans **Settings → Environments → prod → Required reviewers**.
+
+Les deux environnements `staging` et `prod` sont visibles dans GitHub :
+
+![Liste des environnements GitHub](img/confing-env1.png)
+
+La protection de l'environnement `prod` avec l'approbation obligatoire :
+
+![Configuration de l'environnement prod](img/config-env2.png)
+
+```
+Dev branch  →  build-images  →  deploy-staging
+tag v*      →  build-images  →  deploy-prod (approbation requise)
+```
+
+### Validation manuelle en action
+
+Quand un tag `v*` est poussé, le job production se met en pause et attend qu'un reviewer approuve :
+
+![Le job prod en attente d'approbation](img/prod1.png)
+
+Le reviewer voit une fenêtre d'approbation avec un champ commentaire :
+
+![Fenêtre d'approbation](img/prod2.png)
+
+Une fois approuvé, le déploiement reprend automatiquement :
+
+![Déploiement approuvé et en cours](img/prod3.png)

@@ -3,6 +3,7 @@ const cors = require("cors");
 const logger = require("./middleware/logger");
 const healthRoutes = require("./routes/health");
 const productRoutes = require("./routes/products");
+const db = require("./db");
 
 const app = express();
 
@@ -13,9 +14,19 @@ app.use(logger);
 app.get("/", (req, res) => {
   res.json({
     name: "ShopLite API",
-    version: "0.1.0",
-    endpoints: ["/health", "/products"]
+    version: process.env.APP_VERSION || "dev",
+    endpoints: ["/health", "/ready", "/products"],
   });
+});
+
+// GET /ready — vérifie que l'API et PostgreSQL sont prêts (utilisé par le healthcheck Compose)
+app.get("/ready", async (req, res) => {
+  try {
+    await db.query("SELECT 1");
+    res.json({ status: "ready", database: "ok" });
+  } catch {
+    res.status(503).json({ status: "not ready", database: "error" });
+  }
 });
 
 app.use("/health", healthRoutes);
@@ -29,11 +40,11 @@ app.use((err, req, res, next) => {
   console.error(
     JSON.stringify({
       level: "error",
+      request_id: req.requestId || null,
       message: err.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
   );
-
   res.status(500).json({ error: "Internal server error" });
 });
 

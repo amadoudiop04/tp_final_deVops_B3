@@ -8,6 +8,16 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 FROM node:20-alpine AS runner
 
+ARG BUILD_VERSION=dev
+ARG GIT_SHA=unknown
+ARG BUILD_DATE=unknown
+
+LABEL org.opencontainers.image.title="shoplite-api" \
+      org.opencontainers.image.description="ShopLite — API Node.js" \
+      org.opencontainers.image.version="${BUILD_VERSION}" \
+      org.opencontainers.image.revision="${GIT_SHA}" \
+      org.opencontainers.image.created="${BUILD_DATE}"
+
 WORKDIR /app
 
 ENV NODE_ENV=production

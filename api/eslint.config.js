@@ -1,42 +1,36 @@
-const js = require("@eslint/js");
+"use strict";
+
+const globals = require("globals");
 
 module.exports = [
-  js.configs.recommended,
   {
     files: ["src/**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
-      globals: {
-        require: "readonly",
-        module: "readonly",
-        exports: "readonly",
-        process: "readonly",
-        console: "readonly",
-        __dirname: "readonly",
-      },
+      sourceType: "commonjs",
+      globals: globals.node,
     },
     rules: {
-      "no-unused-vars": "warn",
-      "no-console": "off",
+      "no-unused-vars": ["error", { args: "none" }],
+      "eqeqeq": ["error", "always"],
+      "no-var": "error",
+      "prefer-const": "error",
     },
   },
   {
     files: ["tests/**/*.js"],
     languageOptions: {
       ecmaVersion: 2022,
+      sourceType: "commonjs",
       globals: {
-        require: "readonly",
-        test: "readonly",
-        expect: "readonly",
-        describe: "readonly",
-        beforeAll: "readonly",
-        afterAll: "readonly",
-        beforeEach: "readonly",
-        afterEach: "readonly",
+        ...globals.node,
+        ...globals.jest,
       },
     },
     rules: {
-      "no-unused-vars": "warn",
+      "no-unused-vars": ["error", { args: "none" }],
+      "eqeqeq": ["error", "always"],
+      "no-var": "error",
     },
   },
 ];
