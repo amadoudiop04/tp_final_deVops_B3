@@ -48,7 +48,15 @@ jobs:
           echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"  >> "$GITHUB_OUTPUT"
 
       - name: Préparer le .env
-        run: cp .env.example .env
+        env:
+          SECRET_POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          SECRET_POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          SECRET_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          cp .env.example .env
+          [ -n "$SECRET_POSTGRES_DB" ]       && sed -i "s|POSTGRES_DB=.*|POSTGRES_DB=${SECRET_POSTGRES_DB}|"             .env || true
+          [ -n "$SECRET_POSTGRES_USER" ]     && sed -i "s|POSTGRES_USER=.*|POSTGRES_USER=${SECRET_POSTGRES_USER}|"       .env || true
+          [ -n "$SECRET_POSTGRES_PASSWORD" ] && sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${SECRET_POSTGRES_PASSWORD}|" .env || true
 
       - name: Build shoplite-api
         run: |
@@ -88,7 +96,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Préparer le .env
-        run: cp .env.example .env
+        env:
+          SECRET_POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          SECRET_POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          SECRET_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          cp .env.example .env
+          [ -n "$SECRET_POSTGRES_DB" ]       && sed -i "s|POSTGRES_DB=.*|POSTGRES_DB=${SECRET_POSTGRES_DB}|"             .env || true
+          [ -n "$SECRET_POSTGRES_USER" ]     && sed -i "s|POSTGRES_USER=.*|POSTGRES_USER=${SECRET_POSTGRES_USER}|"       .env || true
+          [ -n "$SECRET_POSTGRES_PASSWORD" ] && sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${SECRET_POSTGRES_PASSWORD}|" .env || true
 
       - name: Démarrer la stack staging
         run: |
@@ -150,7 +166,15 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Préparer le .env
-        run: cp .env.example .env
+        env:
+          SECRET_POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+          SECRET_POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          SECRET_POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+        run: |
+          cp .env.example .env
+          [ -n "$SECRET_POSTGRES_DB" ]       && sed -i "s|POSTGRES_DB=.*|POSTGRES_DB=${SECRET_POSTGRES_DB}|"             .env || true
+          [ -n "$SECRET_POSTGRES_USER" ]     && sed -i "s|POSTGRES_USER=.*|POSTGRES_USER=${SECRET_POSTGRES_USER}|"       .env || true
+          [ -n "$SECRET_POSTGRES_PASSWORD" ] && sed -i "s|POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=${SECRET_POSTGRES_PASSWORD}|" .env || true
 
       - name: Démarrer la stack production
         run: |

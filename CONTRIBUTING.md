@@ -1,3 +1,115 @@
-# Contribution
+# Guide de contribution — ShopLite
 
-A compléter pendant le TP: branches, commits, pull requests et code review.
+## Stratégie de branches
+
+```
+main          ← production stable, protégée (PR + CI verte obligatoires)
+Dev           ← intégration, déploiement staging automatique
+feat/*        ← nouvelles fonctionnalités (ex: feat/backup)
+hotfix/*      ← corrections urgentes depuis main
+```
+
+### Règles
+
+- Ne jamais pousser directement sur `main`
+- Toute modification passe par une Pull Request
+- La branche doit être à jour avec `main` avant le merge
+- La CI doit être verte (lint + tests + coverage ≥ 80%)
+- Au moins une review approuvée obligatoire
+
+---
+
+## Commits conventionnels
+
+Format : `type(scope): message`
+
+| Type | Usage |
+|------|-------|
+| `feat` | Nouvelle fonctionnalité |
+| `fix` | Correction de bug |
+| `docs` | Documentation uniquement |
+| `ci` | Modification CI/CD |
+| `test` | Ajout ou modification de tests |
+| `chore` | Maintenance (deps, config) |
+| `hotfix` | Correction urgente en production |
+
+**Exemples :**
+```
+feat(api): ajouter validation paramètre limit
+fix(health): retourner 503 quand la DB est down
+ci: ajouter matrix builds Node 18/20
+docs(readme): mettre à jour les commandes de lancement
+test(products): ajouter tests scénarios erreur 400/500
+hotfix(rollback): corriger port staging dans rollback.sh
+```
+
+---
+
+## Ouvrir une Pull Request
+
+1. Créer une branche depuis `Dev` : `git checkout -b feat/ma-feature`
+2. Commiter avec le format conventionnel
+3. Pousser : `git push origin feat/ma-feature`
+4. Ouvrir la PR vers `Dev` sur GitHub
+5. Remplir le template de PR (objectif, tests, rollback)
+6. Attendre la CI verte + une approbation
+
+---
+
+## Workflow hotfix
+
+```bash
+# Depuis main
+git checkout main
+git checkout -b hotfix/v1.0.x
+
+# Corriger, commiter
+git commit -m "hotfix: description de la correction"
+
+# Merger vers main
+git checkout main
+git merge --no-ff hotfix/v1.0.x
+git tag v1.0.x
+
+# Propager vers Dev
+git checkout Dev
+git merge --no-ff hotfix/v1.0.x
+
+# Supprimer la branche
+git branch -d hotfix/v1.0.x
+```
+
+---
+
+## Revenir en arrière (git revert)
+
+En cas de commit problématique en production, utiliser `git revert` plutôt que `git reset` :
+
+```bash
+# Annuler un commit spécifique (conserve l'historique)
+git revert <sha-du-commit> --no-edit
+
+# Ne jamais utiliser git reset --hard sur une branche partagée
+```
+
+---
+
+## Qualité du code
+
+Avant tout commit, vérifier :
+
+```bash
+cd api
+npm run format:check   # vérifier le formatage Prettier
+npm run lint:ci        # vérifier ESLint (0 warning autorisé)
+npm test               # tests unitaires
+npm run test:coverage  # coverage ≥ 80%
+```
+
+---
+
+## Secrets
+
+- Ne jamais commiter `.env` (présent dans `.gitignore`)
+- Utiliser `.env.example` pour documenter les variables attendues
+- Les vraies valeurs vont dans GitHub Secrets (Settings → Secrets → Actions)
