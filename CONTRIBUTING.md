@@ -33,17 +33,6 @@ Format : `type(scope): message`
 | `chore` | Maintenance (deps, config) |
 | `hotfix` | Correction urgente en production |
 
-**Exemples :**
-```
-feat(api): ajouter validation paramètre limit
-fix(health): retourner 503 quand la DB est down
-ci: ajouter matrix builds Node 18/20
-docs(readme): mettre à jour les commandes de lancement
-test(products): ajouter tests scénarios erreur 400/500
-hotfix(rollback): corriger port staging dans rollback.sh
-```
-
----
 
 ## Ouvrir une Pull Request
 
@@ -89,7 +78,6 @@ En cas de commit problématique en production, utiliser `git revert` plutôt que
 # Annuler un commit spécifique (conserve l'historique)
 git revert <sha-du-commit> --no-edit
 
-# Ne jamais utiliser git reset --hard sur une branche partagée
 ```
 
 ---
@@ -101,15 +89,7 @@ Avant tout commit, vérifier :
 ```bash
 cd api
 npm run format:check   # vérifier le formatage Prettier
-npm run lint:ci        # vérifier ESLint (0 warning autorisé)
+npm run lint:ci       
 npm test               # tests unitaires
-npm run test:coverage  # coverage ≥ 80%
+npm run test:coverage  
 ```
-
----
-
-## Secrets
-
-- Ne jamais commiter `.env` (présent dans `.gitignore`)
-- Utiliser `.env.example` pour documenter les variables attendues
-- Les vraies valeurs vont dans GitHub Secrets (Settings → Secrets → Actions)
